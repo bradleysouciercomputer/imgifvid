@@ -22,6 +22,7 @@ const state = {
   search: '',
   queue: [],
   previewPost: null,
+  postPagePost: null,
   authMode: 'signin',
   loadingFeed: false,
   uploading: false
@@ -86,6 +87,14 @@ function getSiteUrl() {
 
 function getPublicUrl(path) {
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+function getPostUrl(postId) {
+  const url = new URL(getSiteUrl(), window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('post', postId);
+  return url.href;
 }
 
 function formatBytes(bytes) {
@@ -301,12 +310,12 @@ function renderPosts() {
       '</div>';
     card.addEventListener('click', function (event) {
       if (event.target.closest('[data-share]')) return;
-      setPreviewContent(post);
+      window.location.assign(getPostUrl(post.id));
     });
     card.addEventListener('keydown', function (event) {
       if ((event.key === 'Enter' || event.key === ' ') && event.target === card) {
         event.preventDefault();
-        setPreviewContent(post);
+        window.location.assign(getPostUrl(post.id));
       }
     });
     grid.appendChild(card);
@@ -483,16 +492,21 @@ function setFilter(filter) {
   renderPosts();
 }
 
+async function copyPostLink(post) {
+  if (!post) return;
+  const url = getPostUrl(post.id);
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Post link copied. Share the imgifvid page!');
+  } catch (error) {
+    window.prompt('Copy this imgifvid post link:', url);
+  }
+}
+
 async function copyShareLink(postId) {
   const post = state.posts.find(function (item) { return item.id === postId; });
   if (!post) return;
-  const url = getPublicUrl(post.storage_path);
-  try {
-    await navigator.clipboard.writeText(url);
-    showToast('Public media link copied.');
-  } catch (error) {
-    window.prompt('Copy this public media link:', url);
-  }
+  await copyPostLink(post);
 }
 
 async function removeMediaObjectAndVerify(storagePath) {
@@ -610,11 +624,12 @@ async function cleanupOrphanedMediaObjects() {
 }
 
 async function deletePreviewPost() {
-  const post = state.previewPost;
+  const post = state.postPagePost || state.previewPost;
   if (!post || !state.user || post.user_id !== state.user.id) return;
+  const deletingFromPostPage = Boolean(state.postPagePost && state.postPagePost.id === post.id);
   const accepted = window.confirm('Delete this post permanently? The media file will no longer be available.');
   if (!accepted) return;
-  const button = $('#preview-delete');
+  const button = deletingFromPostPage ? $('#post-page-delete') : $('#preview-delete');
   button.disabled = true;
   button.textContent = 'Deleting…';
   try {
@@ -622,9 +637,15 @@ async function deletePreviewPost() {
     await removeMediaObjectAndVerify(post.storage_path);
     const rowResult = await supabase.from('media_posts').delete().eq('id', post.id);
     if (rowResult.error) throw rowResult.error;
+    state.posts = state.posts.filter(function (item) { return item.id !== post.id; });
+    if (deletingFromPostPage) {
+      state.postPagePost = null;
+      showToast('Post deleted.');
+      window.location.assign('./#discover');
+      return;
+    }
     $('#preview-dialog').close();
     state.previewPost = null;
-    state.posts = state.posts.filter(function (item) { return item.id !== post.id; });
     renderPosts();
     showToast('Post deleted.');
   } catch (error) {
@@ -767,6 +788,10 @@ $('#preview-dialog').addEventListener('click', function (event) {
   if (event.target === $('#preview-dialog')) $('#preview-dialog').close();
 });
 $('#preview-delete').addEventListener('click', deletePreviewPost);
+$('#post-page-share').addEventListener('click', function () {
+  copyPostLink(state.postPagePost);
+});
+$('#post-page-delete').addEventListener('click', deletePreviewPost);
 $('#preview-dialog').addEventListener('close', function () {
   $('#preview-stage').innerHTML = '';
   state.previewPost = null;
@@ -786,13 +811,95 @@ supabase.auth.onAuthStateChange(function (event, session) {
   }
 });
 
+async function openPostPage(postId) {
+  const homeView = $('#home-view');
+  const page = $('#post-page');
+  const message = $('#post-page-message');
+  const detail = $('#post-detail');
+  homeView.hidden = true;
+  page.hidden = false;
+  detail.hidden = true;
+  message.hidden = false;
+  message.textContent = 'Loading post…';
+
+  if (!postId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(postId)) {
+    message.textContent = 'That post link does not look valid. Head back to the gallery to find something else.';
+    document.title = 'Post not found — imgifvid';
+    return;
+  }
+
+  try {
+    const result = await supabase.from('media_posts')
+      .select('id,user_id,title,description,storage_path,original_name,mime_type,media_kind,file_size_bytes,created_at')
+      .eq('id', postId)
+      .maybeSingle();
+    if (result.error) throw result.error;
+    if (!result.data) {
+      message.textContent = 'This post may have been deleted, or the link may be incorrect.';
+      document.title = 'Post not found — imgifvid';
+      return;
+    }
+
+    const post = result.data;
+    state.postPagePost = post;
+    const title = post.title || titleFromFilename(post.original_name);
+    const url = getPublicUrl(post.storage_path);
+    const kindLabel = post.media_kind === 'gif' ? 'GIF' : post.media_kind === 'video' ? 'VIDEO' : 'IMAGE';
+
+    $('#post-page-kind').textContent = kindLabel + ' / IMGIFVID POST';
+    $('#post-detail-type').textContent = 'FROM THE COMMUNITY / ' + kindLabel;
+    $('#post-page-title').textContent = title;
+    $('#post-page-description').textContent = post.description || '';
+    $('#post-page-description').hidden = !post.description;
+    $('#post-page-date').textContent = 'Posted ' + formatDate(post.created_at);
+    $('#post-page-size').textContent = formatBytes(Number(post.file_size_bytes) || 0);
+    $('#post-page-original').href = url;
+    $('#post-page-delete').hidden = !(state.user && state.user.id === post.user_id);
+    $('#post-page-message').hidden = true;
+    $('#post-detail').hidden = false;
+
+    const media = $('#post-detail-media');
+    media.innerHTML = '';
+    if (post.media_kind === 'video') {
+      const video = document.createElement('video');
+      video.src = url;
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      video.setAttribute('aria-label', title);
+      media.appendChild(video);
+    } else {
+      const image = document.createElement('img');
+      image.src = url;
+      image.alt = title;
+      image.decoding = 'async';
+      media.appendChild(image);
+    }
+
+    document.title = title + ' — imgifvid';
+    const descriptionMeta = document.querySelector('meta[name="description"]');
+    if (descriptionMeta) {
+      descriptionMeta.content = (post.description || 'View this ' + post.media_kind + ' post on imgifvid.').slice(0, 250);
+    }
+  } catch (error) {
+    console.error('Could not load post page:', error);
+    message.textContent = 'We could not load this post right now. Please try again, or return to the gallery.';
+    document.title = 'Post unavailable — imgifvid';
+  }
+}
+
 async function boot() {
   const result = await supabase.auth.getSession();
   state.user = result.data && result.data.session ? result.data.session.user : null;
   updateAuthUI();
   renderQueue();
   await loadPosts();
-  if (new URLSearchParams(window.location.search).has('reset-password')) {
+  const params = new URLSearchParams(window.location.search);
+  const postId = params.get('post');
+  if (postId) {
+    await openPostPage(postId);
+  }
+  if (params.has('reset-password')) {
     openAuth('update');
   }
 }
