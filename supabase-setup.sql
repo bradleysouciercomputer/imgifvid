@@ -138,6 +138,12 @@ create policy "Users upload their own avatars"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid()::text));
 
+-- Let users verify deletion and clean up files only inside their own avatar folder.
+drop policy if exists "Users can list their own avatars" on storage.objects;
+create policy "Users can list their own avatars"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
 drop policy if exists "Users delete their own avatars" on storage.objects;
 create policy "Users delete their own avatars"
   on storage.objects for delete to authenticated
