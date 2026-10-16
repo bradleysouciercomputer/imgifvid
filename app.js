@@ -43,6 +43,7 @@ const authPassword = $('#auth-password');
 const passwordField = $('#password-field');
 const toast = $('#toast');
 let toastTimer = null;
+let orphanCleanupRunning = false;
 
 const MIME_BY_EXT = {
   jpg: 'image/jpeg',
@@ -532,6 +533,76 @@ async function removeMediaObjectAndVerify(storagePath) {
   }
 }
 
+async function cleanupOrphanedMediaObjects() {
+  // A removed gallery row can leave a raw Storage object behind if an older
+  // delete path only removed the database record. Limit cleanup to this signed-in
+  // user's folder and only remove objects that have no matching post row.
+  if (!state.user || orphanCleanupRunning) return;
+  orphanCleanupRunning = true;
+  const ownerId = state.user.id;
+
+  try {
+    const referencedPaths = new Set();
+    let rowOffset = 0;
+    const rowPageSize = 1000;
+
+    while (true) {
+      const rows = await supabase
+        .from('media_posts')
+        .select('id,storage_path')
+        .eq('user_id', ownerId)
+        .order('id', { ascending: true })
+        .range(rowOffset, rowOffset + rowPageSize - 1);
+
+      if (rows.error) throw rows.error;
+      for (const row of rows.data || []) referencedPaths.add(row.storage_path);
+      if (!rows.data || rows.data.length < rowPageSize) break;
+      rowOffset += rows.data.length;
+    }
+
+    const ownerFiles = [];
+    let fileOffset = 0;
+    const filePageSize = 100;
+
+    while (true) {
+      const listed = await supabase.storage.from(BUCKET).list(ownerId, {
+        limit: filePageSize,
+        offset: fileOffset,
+        sortBy: { column: 'name', order: 'asc' }
+      });
+
+      if (listed.error) throw listed.error;
+      const entries = listed.data || [];
+      ownerFiles.push(...entries.filter(function (entry) {
+        // Folders have a null id/metadata; uploaded objects have a storage id.
+        return Boolean(entry.id || entry.metadata);
+      }));
+      if (entries.length < filePageSize) break;
+      fileOffset += entries.length;
+    }
+
+    let removedCount = 0;
+    for (const file of ownerFiles) {
+      if (state.user?.id !== ownerId) return;
+      const path = ownerId + '/' + file.name;
+      if (referencedPaths.has(path)) continue;
+      await removeMediaObjectAndVerify(path);
+      removedCount += 1;
+    }
+
+    if (removedCount > 0) {
+      console.info('Removed ' + removedCount + ' orphaned imgifvid Storage object(s).');
+      showToast(removedCount + ' old orphaned media file(s) cleaned up.');
+    }
+  } catch (error) {
+    // Do not delete database rows as part of cleanup. A failed verification is
+    // logged so that a temporary Storage issue cannot cause additional loss.
+    console.warn('Could not clean orphaned media objects:', error);
+  } finally {
+    orphanCleanupRunning = false;
+  }
+}
+
 async function deletePreviewPost() {
   const post = state.previewPost;
   if (!post || !state.user || post.user_id !== state.user.id) return;
@@ -701,6 +772,7 @@ supabase.auth.onAuthStateChange(function (event, session) {
   if (['INITIAL_SESSION', 'SIGNED_IN', 'SIGNED_OUT', 'PASSWORD_RECOVERY', 'USER_UPDATED'].includes(event)) {
     window.setTimeout(function () {
       loadPosts();
+      if (state.user) cleanupOrphanedMediaObjects();
     }, 0);
   }
   if (event === 'PASSWORD_RECOVERY') {
