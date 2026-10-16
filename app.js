@@ -410,8 +410,12 @@ async function uploadQueue() {
   const issues = [];
   let completed = 0;
   const originalQueue = state.queue.slice();
-  const sharedTitle = $('#upload-title').value.trim();
-  const description = $('#upload-description').value.trim();
+  // Use the form input IDs, not the section heading IDs. Defensive
+  // fallbacks prevent an absent optional field from stranding the upload UI.
+  const titleField = $('#upload-post-title');
+  const descriptionField = $('#upload-description');
+  const sharedTitle = titleField?.value?.trim() || '';
+  const description = descriptionField?.value?.trim() || '';
 
   for (let i = 0; i < originalQueue.length; i += 1) {
     const item = originalQueue[i];
@@ -459,8 +463,8 @@ async function uploadQueue() {
   renderQueue();
 
   if (completed > 0) {
-    $('#upload-title').value = '';
-    $('#upload-description').value = '';
+    if (titleField) titleField.value = '';
+    if (descriptionField) descriptionField.value = '';
     await loadPosts();
   }
   if (completed && !issues.length) showToast(completed === 1 ? 'Your post is live in the gallery.' : completed + ' posts are live in the gallery.');
