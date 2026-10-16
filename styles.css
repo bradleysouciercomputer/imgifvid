@@ -332,3 +332,38 @@ h1, h2, h3 { font-family: 'Manrope', sans-serif; letter-spacing: -1.1px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Standalone shareable post pages */
+.post-page { min-height: 58vh; padding-top: 45px; padding-bottom: 100px; }
+.post-page-topline { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 23px; }
+.post-back-link { color: #c7b6ff; font-size: 12px; font-weight: 600; }
+.post-back-link:hover { color: #ffb2c9; }
+.post-page-kind { color: #9189a8; font: 10px 'DM Mono', monospace; letter-spacing: 1px; }
+.post-page-message { padding: 28px 30px; border: 1px solid var(--line); border-radius: 16px; color: #b7b0c6; background: rgba(255,255,255,.025); line-height: 1.7; font-size: 13px; }
+.post-detail { overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr); border: 1px solid var(--line); border-radius: 23px; background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.012)); box-shadow: 0 25px 70px rgba(0,0,0,.17); }
+.post-detail-media { min-width: 0; min-height: 360px; padding: 14px; background: #0c0b11; display: flex; justify-content: center; align-items: center; border-right: 1px solid var(--line); }
+.post-detail-media img, .post-detail-media video { display: block; width: 100%; max-height: 76vh; object-fit: contain; border-radius: 12px; }
+.post-detail-media img { height: auto; }
+.post-detail-media video { background: #08080c; }
+.post-detail-body { padding: 34px 29px 28px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.post-detail-body h1 { font-size: clamp(27px, 3vw, 39px); line-height: 1.14; letter-spacing: -1.7px; overflow-wrap: anywhere; margin: 14px 0 13px; }
+.post-detail-description { white-space: pre-wrap; color: #b3adbf; line-height: 1.8; font-size: 13px; margin: 0 0 24px; overflow-wrap: anywhere; }
+.post-page-meta { display: flex; justify-content: space-between; flex-wrap: wrap; width: 100%; gap: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 15px 0; margin-top: auto; color: #878196; font: 10px 'DM Mono', monospace; }
+.post-page-actions { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 9px; padding-top: 20px; }
+.post-page-actions .button { width: 100%; font-size: 11px; }
+.post-page-notice { display: flex; gap: 8px; margin: 22px 0 0; color: #807a91; font-size: 10px; line-height: 1.7; }
+.post-page-notice span { color: var(--pink); flex-shrink: 0; }
+@media (max-width: 850px) {
+  .post-page { padding-top: 28px; padding-bottom: 70px; }
+  .post-detail { grid-template-columns: 1fr; }
+  .post-detail-media { min-height: 230px; max-height: 65vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  .post-detail-media img, .post-detail-media video { max-height: 60vh; }
+  .post-detail-body { padding: 26px 24px 23px; }
+  .post-page-meta { margin-top: 8px; }
+}
+@media (max-width: 480px) {
+  .post-page-topline { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .post-detail-media { padding: 8px; }
+  .post-detail-body { padding: 21px 18px 20px; }
+  .post-detail-body h1 { font-size: 29px; }
+}
