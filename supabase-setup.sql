@@ -54,6 +54,43 @@ grant usage on schema public to anon, authenticated;
 grant select on public.media_posts to anon, authenticated;
 grant insert, delete on public.media_posts to authenticated;
 
+-- Comments belong to a single post and are removed automatically with it.
+create table if not exists public.post_comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.media_posts(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 1000 and char_length(trim(body)) > 0),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists post_comments_post_created_idx
+  on public.post_comments (post_id, created_at desc);
+create index if not exists post_comments_user_created_idx
+  on public.post_comments (user_id, created_at desc);
+
+alter table public.post_comments enable row level security;
+
+drop policy if exists "Anyone can read post comments" on public.post_comments;
+create policy "Anyone can read post comments"
+  on public.post_comments for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "Members can comment as themselves" on public.post_comments;
+create policy "Members can comment as themselves"
+  on public.post_comments for insert
+  to authenticated
+  with check ((select auth.uid()) = user_id);
+
+drop policy if exists "Members can delete their own comments" on public.post_comments;
+create policy "Members can delete their own comments"
+  on public.post_comments for delete
+  to authenticated
+  using ((select auth.uid()) = user_id);
+
+grant select on public.post_comments to anon, authenticated;
+grant insert, delete on public.post_comments to authenticated;
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'media',
