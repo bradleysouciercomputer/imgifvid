@@ -656,7 +656,7 @@ async function removeAvatarObjectAndVerify(storagePath) {
     throw new Error(
       reason
         ? 'The profile picture is still in Storage: ' + reason.message
-        : 'Storage did not remove the profile picture. It was kept linked to your profile so you can retry.'
+        : 'Storage still contains the profile picture after a retry.'
     );
   }
 }
