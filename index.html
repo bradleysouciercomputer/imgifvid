@@ -153,6 +153,36 @@
           <p class="post-page-notice"><span aria-hidden="true">ⓘ</span> This post page is shareable. The original media remains in imgifvid storage.</p>
         </div>
       </article>
+      <section class="comments-panel" id="comments-panel" aria-labelledby="comments-heading">
+        <div class="comments-header">
+          <div>
+            <div class="section-kicker">THE CONVERSATION</div>
+            <h2 id="comments-heading">Leave a little <span>love.</span></h2>
+          </div>
+          <span class="comments-count" id="comments-count">Loading comments…</span>
+        </div>
+        <div class="comments-list" id="comments-list" aria-live="polite">
+          <p class="comments-empty">Loading comments…</p>
+        </div>
+        <div class="comments-auth-prompt" id="comments-auth-prompt" hidden>
+          <span class="comments-prompt-icon" aria-hidden="true">✳</span>
+          <div class="comments-prompt-copy">
+            <strong>Got something to say?</strong>
+            <p>Sign in to join the conversation.</p>
+          </div>
+          <button class="button button-secondary" id="comments-sign-in" type="button">Sign in to comment ↗</button>
+        </div>
+        <form class="comment-form" id="comment-form" hidden>
+          <label for="comment-body">Write a comment
+            <textarea id="comment-body" name="comment" rows="3" maxlength="1000" placeholder="Keep it kind. What do you think?" required></textarea>
+          </label>
+          <div class="comment-form-footer">
+            <span class="comment-guideline"><span id="comment-char-count">0/1000</span> · Be thoughtful, be kind.</span>
+            <button class="button button-primary" id="comment-submit" type="submit">Post comment ↗</button>
+          </div>
+        </form>
+        <div class="comment-message" id="comment-message" role="status" hidden></div>
+      </section>
     </section>
   </main>
 
