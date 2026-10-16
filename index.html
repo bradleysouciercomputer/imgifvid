@@ -15,15 +15,15 @@
   <div class="ambient ambient-two" aria-hidden="true"></div>
 
   <header class="topbar">
-    <a class="brand" href="#top" aria-label="imgifvid home">
+    <a class="brand" href="./" aria-label="imgifvid home">
       <span class="brand-symbol" aria-hidden="true">
         <svg viewBox="0 0 42 42" fill="none"><rect x="2" y="2" width="38" height="38" rx="13" fill="url(#brand-gradient)"/><path d="M11 27.5 18 19l4.8 5.3 3.4-3.8 5.8 7H11Z" fill="white" fill-opacity=".96"/><circle cx="27.8" cy="14.2" r="3.2" fill="white"/><defs><linearGradient id="brand-gradient" x1="3" y1="2" x2="39" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#B69CFF"/><stop offset=".52" stop-color="#7863F5"/><stop offset="1" stop-color="#FA7DA4"/></linearGradient></defs></svg>
       </span>
       <span class="brand-word">imgifvid<span class="brand-period">.</span></span>
     </a>
     <nav class="topnav" aria-label="Main navigation">
-      <a class="nav-link active" href="#discover">Discover</a>
-      <a class="nav-link" href="#upload-section">Upload</a>
+      <a class="nav-link active" href="./#discover">Discover</a>
+      <a class="nav-link" href="./#upload-section">Upload</a>
     </nav>
     <div class="top-actions">
       <span class="user-pill" id="user-pill" hidden><span class="user-dot"></span><span id="user-email"></span></span>
@@ -33,6 +33,7 @@
   </header>
 
   <main id="top">
+    <div id="home-view">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
         <div class="eyebrow"><span class="eyebrow-spark">✳</span> YOUR LITTLE CORNER OF THE INTERNET</div>
@@ -126,16 +127,43 @@
       <div class="empty-state" id="empty-state" hidden><div class="empty-art">✳</div><h3>It's a little quiet in here.</h3><p>Be the first to add something worth a second look.</p><a class="button button-primary" href="#upload-section">Add the first post <span aria-hidden="true">↗</span></a></div>
       <div class="gallery-footer"><span>GOOD THINGS ARE MEANT TO BE SHARED.</span><button class="text-link" id="refresh-feed" type="button">Refresh gallery ↻</button></div>
     </section>
+    </div>
+
+    <section class="post-page section-wrap" id="post-page" aria-labelledby="post-page-title" hidden>
+      <div class="post-page-topline">
+        <a class="post-back-link" href="./#discover">← Back to gallery</a>
+        <span class="post-page-kind" id="post-page-kind">COMMUNITY POST</span>
+      </div>
+      <div class="post-page-message" id="post-page-message" role="status">Loading post…</div>
+      <article class="post-detail" id="post-detail" hidden>
+        <div class="post-detail-media" id="post-detail-media"></div>
+        <div class="post-detail-body">
+          <div class="section-kicker" id="post-detail-type">FROM THE COMMUNITY</div>
+          <h1 id="post-page-title">A little moment.</h1>
+          <p class="post-detail-description" id="post-page-description"></p>
+          <div class="post-page-meta">
+            <span id="post-page-date"></span>
+            <span id="post-page-size"></span>
+          </div>
+          <div class="post-page-actions">
+            <button class="button button-primary" id="post-page-share" type="button">Copy post link ↗</button>
+            <a class="button button-secondary" id="post-page-original" href="#" target="_blank" rel="noopener noreferrer">Open original file ↗</a>
+            <button class="button button-danger" id="post-page-delete" type="button" hidden>Delete my post</button>
+          </div>
+          <p class="post-page-notice"><span aria-hidden="true">ⓘ</span> This post page is shareable. The original media remains in imgifvid storage.</p>
+        </div>
+      </article>
+    </section>
   </main>
 
   <footer class="footer">
-    <a class="brand footer-brand" href="#top"><span class="brand-symbol" aria-hidden="true"><svg viewBox="0 0 42 42" fill="none"><rect x="2" y="2" width="38" height="38" rx="13" fill="url(#footer-gradient)"/><path d="M11 27.5 18 19l4.8 5.3 3.4-3.8 5.8 7H11Z" fill="white"/><circle cx="27.8" cy="14.2" r="3.2" fill="white"/><defs><linearGradient id="footer-gradient" x1="3" y1="2" x2="39" y2="40"><stop stop-color="#B69CFF"/><stop offset="1" stop-color="#FA7DA4"/></linearGradient></defs></svg></span><span class="brand-word">imgifvid<span class="brand-period">.</span></span></a>
+    <a class="brand footer-brand" href="./"><span class="brand-symbol" aria-hidden="true"><svg viewBox="0 0 42 42" fill="none"><rect x="2" y="2" width="38" height="38" rx="13" fill="url(#footer-gradient)"/><path d="M11 27.5 18 19l4.8 5.3 3.4-3.8 5.8 7H11Z" fill="white"/><circle cx="27.8" cy="14.2" r="3.2" fill="white"/><defs><linearGradient id="footer-gradient" x1="3" y1="2" x2="39" y2="40"><stop stop-color="#B69CFF"/><stop offset="1" stop-color="#FA7DA4"/></linearGradient></defs></svg></span><span class="brand-word">imgifvid<span class="brand-period">.</span></span></a>
     <span class="footer-note">A small home for your favorite pixels.</span>
-    <a href="#top" class="back-top">Back to top ↑</a>
+    <a href="./#top" class="back-top">Back to top ↑</a>
   </footer>
 
   <dialog class="site-dialog auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
-    <div class="dialog-top"><a class="brand" href="#top"><span class="brand-symbol" aria-hidden="true"><svg viewBox="0 0 42 42" fill="none"><rect x="2" y="2" width="38" height="38" rx="13" fill="url(#auth-gradient)"/><path d="M11 27.5 18 19l4.8 5.3 3.4-3.8 5.8 7H11Z" fill="white"/><circle cx="27.8" cy="14.2" r="3.2" fill="white"/><defs><linearGradient id="auth-gradient" x1="3" y1="2" x2="39" y2="40"><stop stop-color="#B69CFF"/><stop offset="1" stop-color="#FA7DA4"/></linearGradient></defs></svg></span><span class="brand-word">imgifvid<span class="brand-period">.</span></span></a><button class="icon-button" id="auth-close" type="button" aria-label="Close sign in dialog">×</button></div>
+    <div class="dialog-top"><a class="brand" href="./"><span class="brand-symbol" aria-hidden="true"><svg viewBox="0 0 42 42" fill="none"><rect x="2" y="2" width="38" height="38" rx="13" fill="url(#auth-gradient)"/><path d="M11 27.5 18 19l4.8 5.3 3.4-3.8 5.8 7H11Z" fill="white"/><circle cx="27.8" cy="14.2" r="3.2" fill="white"/><defs><linearGradient id="auth-gradient" x1="3" y1="2" x2="39" y2="40"><stop stop-color="#B69CFF"/><stop offset="1" stop-color="#FA7DA4"/></linearGradient></defs></svg></span><span class="brand-word">imgifvid<span class="brand-period">.</span></span></a><button class="icon-button" id="auth-close" type="button" aria-label="Close sign in dialog">×</button></div>
     <div class="auth-content">
       <div class="section-kicker" id="auth-kicker">GOOD TO SEE YOU</div>
       <h2 id="auth-title">Welcome <span>back.</span></h2>
