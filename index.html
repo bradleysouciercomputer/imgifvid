@@ -27,6 +27,7 @@
     </nav>
     <div class="top-actions">
       <span class="user-pill" id="user-pill" hidden><span class="user-dot"></span><span id="user-email"></span></span>
+      <button class="button button-quiet" id="profile-open" type="button" hidden>My profile</button>
       <button class="button button-quiet" id="auth-open" type="button">Sign in <span aria-hidden="true">↗</span></button>
       <button class="button button-quiet" id="sign-out" type="button" hidden>Sign out</button>
     </div>
@@ -183,6 +184,62 @@
         </form>
         <div class="comment-message" id="comment-message" role="status" hidden></div>
       </section>
+    </section>
+
+    <section class="profile-page section-wrap" id="profile-page" hidden aria-labelledby="profile-page-name">
+      <div class="profile-page-topline">
+        <a class="post-back-link" href="./#discover">← Back to gallery</a>
+        <span class="post-page-kind">IMGIFVID MEMBER PROFILE</span>
+      </div>
+      <div class="post-page-message" id="profile-page-message" role="status">Loading profile…</div>
+      <div id="profile-content" hidden>
+        <section class="profile-hero-card">
+          <div class="profile-avatar-shell">
+            <img id="profile-page-avatar" src="" alt="" hidden>
+            <span id="profile-page-avatar-fallback" aria-hidden="true">M</span>
+          </div>
+          <div class="profile-hero-copy">
+            <div class="section-kicker">A LITTLE ABOUT THIS PERSON</div>
+            <h1 id="profile-page-name">Member</h1>
+            <p id="profile-page-bio" class="profile-page-bio"></p>
+            <div class="profile-page-meta"><span id="profile-page-joined"></span><span id="profile-page-post-count"></span></div>
+          </div>
+          <div class="profile-hero-actions">
+            <button class="button button-secondary" id="profile-share" type="button">Share profile ↗</button>
+          </div>
+        </section>
+
+        <section class="profile-editor" id="profile-editor-section" hidden aria-labelledby="profile-editor-title">
+          <div class="profile-editor-heading">
+            <div><div class="section-kicker">YOUR SPACE</div><h2 id="profile-editor-title">Make it <span>you.</span></h2></div>
+            <p>Your name, bio, and avatar appear on your profile and comments.</p>
+          </div>
+          <form id="profile-form">
+            <label for="profile-display-name">Display name
+              <input id="profile-display-name" name="display_name" type="text" minlength="1" maxlength="32" required placeholder="What should people call you?">
+            </label>
+            <label for="profile-bio">Bio <span class="label-note">optional · up to 280 characters</span>
+              <textarea id="profile-bio" name="bio" maxlength="280" rows="3" placeholder="A little about yourself…"></textarea>
+            </label>
+            <label for="profile-avatar-input">Profile picture <span class="label-note">optional · JPG, PNG, WebP, AVIF or GIF · max 5 MB</span>
+              <input id="profile-avatar-input" name="avatar" type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif">
+            </label>
+            <div class="profile-form-footer">
+              <span id="profile-form-message" class="profile-form-message" role="status" hidden></span>
+              <button class="button button-primary" id="profile-save" type="submit">Save profile ↗</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="profile-posts-section" aria-labelledby="profile-posts-title">
+          <div class="section-heading">
+            <div><div class="section-kicker">FROM THIS MEMBER</div><h2 id="profile-posts-title">Shared <span>moments.</span></h2></div>
+            <p>Media this member has shared with the imgifvid community.</p>
+          </div>
+          <div class="gallery-grid" id="profile-posts-grid"></div>
+          <div class="empty-state profile-empty-posts" id="profile-empty-posts" hidden><div class="empty-art">✳</div><h3>Nothing shared just yet.</h3><p>When this member posts media, it will show up here.</p></div>
+        </section>
+      </div>
     </section>
   </main>
 
