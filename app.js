@@ -23,6 +23,8 @@ const state = {
   queue: [],
   previewPost: null,
   postPagePost: null,
+  postComments: [],
+  commentSubmitting: false,
   authMode: 'signin',
   loadingFeed: false,
   uploading: false
@@ -160,6 +162,7 @@ function updateAuthUI() {
   $('#upload-note').textContent = isSignedIn
     ? 'Signed in and ready. Add up to 10 files at a time.'
     : 'You can choose files now; sign in before uploading.';
+  renderCommentComposer();
 }
 
 function renderAuthMode(mode) {
@@ -792,6 +795,16 @@ $('#post-page-share').addEventListener('click', function () {
   copyPostLink(state.postPagePost);
 });
 $('#post-page-delete').addEventListener('click', deletePreviewPost);
+$('#comments-sign-in').addEventListener('click', function () { openAuth('signin'); });
+$('#comment-form').addEventListener('submit', submitPostComment);
+$('#comment-body').addEventListener('input', function (event) {
+  $('#comment-char-count').textContent = event.target.value.length + '/1000';
+  setCommentMessage('', false);
+});
+$('#comments-list').addEventListener('click', function (event) {
+  const button = event.target.closest('[data-delete-comment]');
+  if (button) deletePostComment(button.dataset.deleteComment, button);
+});
 $('#preview-dialog').addEventListener('close', function () {
   $('#preview-stage').innerHTML = '';
   state.previewPost = null;
@@ -804,12 +817,194 @@ supabase.auth.onAuthStateChange(function (event, session) {
     window.setTimeout(function () {
       loadPosts();
       if (state.user) cleanupOrphanedMediaObjects();
+      if (state.postPagePost) loadPostComments(state.postPagePost.id);
     }, 0);
   }
   if (event === 'PASSWORD_RECOVERY') {
     openAuth('update');
   }
 });
+
+function setCommentMessage(message, isError) {
+  const el = $('#comment-message');
+  if (!el) return;
+  el.textContent = message || '';
+  el.hidden = !message;
+  el.classList.toggle('is-error', Boolean(message && isError));
+}
+
+function renderCommentComposer() {
+  const prompt = $('#comments-auth-prompt');
+  const form = $('#comment-form');
+  if (!prompt || !form) return;
+  const hasPost = Boolean(state.postPagePost);
+  prompt.hidden = !hasPost || Boolean(state.user);
+  form.hidden = !hasPost || !state.user;
+  if (!hasPost) return;
+  if (state.user && $('#comment-body') && !state.commentSubmitting) {
+    $('#comment-submit').disabled = false;
+  }
+}
+
+function renderComments(comments) {
+  const list = $('#comments-list');
+  const count = $('#comments-count');
+  if (!list || !count) return;
+
+  count.textContent = comments.length === 1 ? '1 comment' : comments.length + ' comments';
+  list.replaceChildren();
+
+  if (!comments.length) {
+    const empty = document.createElement('p');
+    empty.className = 'comments-empty';
+    empty.textContent = 'No comments yet. Start the conversation.';
+    list.appendChild(empty);
+    return;
+  }
+
+  comments.forEach(function (comment) {
+    const item = document.createElement('article');
+    item.className = 'comment-item';
+
+    const header = document.createElement('div');
+    header.className = 'comment-item-header';
+
+    const identity = document.createElement('div');
+    identity.className = 'comment-identity';
+
+    const avatar = document.createElement('span');
+    avatar.className = 'comment-avatar';
+    avatar.textContent = comment.user_id === (state.user && state.user.id) ? 'Y' : '✳';
+    avatar.setAttribute('aria-hidden', 'true');
+
+    const author = document.createElement('span');
+    author.className = 'comment-author';
+    author.textContent = comment.user_id === (state.user && state.user.id) ? 'You' : 'Community member';
+
+    const time = document.createElement('time');
+    time.className = 'comment-time';
+    time.dateTime = comment.created_at;
+    time.textContent = formatDate(comment.created_at);
+
+    identity.append(avatar, author);
+    header.append(identity, time);
+
+    if (state.user && state.user.id === comment.user_id) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'comment-delete';
+      remove.dataset.deleteComment = comment.id;
+      remove.textContent = 'Delete';
+      remove.setAttribute('aria-label', 'Delete your comment');
+      header.appendChild(remove);
+    }
+
+    const body = document.createElement('p');
+    body.className = 'comment-body';
+    body.textContent = comment.body;
+
+    item.append(header, body);
+    list.appendChild(item);
+  });
+}
+
+async function loadPostComments(postId) {
+  const list = $('#comments-list');
+  const count = $('#comments-count');
+  if (!postId || !list || !count) return;
+
+  count.textContent = 'Loading…';
+  list.innerHTML = '<p class="comments-empty">Loading comments…</p>';
+
+  try {
+    const result = await supabase.from('post_comments')
+      .select('id,post_id,user_id,body,created_at')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (result.error) throw result.error;
+    if (!state.postPagePost || state.postPagePost.id !== postId) return;
+    state.postComments = result.data || [];
+    renderComments(state.postComments);
+    setCommentMessage('', false);
+  } catch (error) {
+    console.error('Could not load comments:', error);
+    count.textContent = 'Comments unavailable';
+    list.innerHTML = '<p class="comments-empty">Comments could not load. Please refresh the page and try again.</p>';
+  }
+}
+
+async function submitPostComment(event) {
+  event.preventDefault();
+  const post = state.postPagePost;
+  const user = state.user;
+  const bodyField = $('#comment-body');
+  const button = $('#comment-submit');
+  const body = bodyField.value.trim();
+
+  if (!post) return;
+  if (!user) {
+    openAuth('signin');
+    return;
+  }
+  if (!body) {
+    setCommentMessage('Write a comment before posting.', true);
+    return;
+  }
+  if (body.length > 1000) {
+    setCommentMessage('Comments must be 1,000 characters or fewer.', true);
+    return;
+  }
+
+  state.commentSubmitting = true;
+  button.disabled = true;
+  button.textContent = 'Posting…';
+  setCommentMessage('', false);
+
+  try {
+    const result = await supabase.from('post_comments').insert({
+      post_id: post.id,
+      user_id: user.id,
+      body: body
+    });
+    if (result.error) throw result.error;
+
+    bodyField.value = '';
+    $('#comment-char-count').textContent = '0/1000';
+    showToast('Comment posted.');
+    await loadPostComments(post.id);
+  } catch (error) {
+    console.error('Could not post comment:', error);
+    setCommentMessage(error.message || 'Your comment could not be posted. Please try again.', true);
+  } finally {
+    state.commentSubmitting = false;
+    button.disabled = false;
+    button.textContent = 'Post comment ↗';
+  }
+}
+
+async function deletePostComment(commentId, button) {
+  const comment = state.postComments.find(function (item) { return item.id === commentId; });
+  if (!comment || !state.user || comment.user_id !== state.user.id) return;
+  if (!window.confirm('Delete your comment?')) return;
+
+  button.disabled = true;
+  button.textContent = 'Deleting…';
+  try {
+    const result = await supabase.from('post_comments')
+      .delete()
+      .eq('id', commentId)
+      .eq('user_id', state.user.id);
+    if (result.error) throw result.error;
+    showToast('Comment deleted.');
+    if (state.postPagePost) await loadPostComments(state.postPagePost.id);
+  } catch (error) {
+    console.error('Could not delete comment:', error);
+    setCommentMessage(error.message || 'Your comment could not be deleted.', true);
+    button.disabled = false;
+    button.textContent = 'Delete';
+  }
+}
 
 async function openPostPage(postId) {
   const homeView = $('#home-view');
@@ -842,6 +1037,8 @@ async function openPostPage(postId) {
 
     const post = result.data;
     state.postPagePost = post;
+    state.postComments = [];
+    renderCommentComposer();
     const title = post.title || titleFromFilename(post.original_name);
     const url = getPublicUrl(post.storage_path);
     const kindLabel = post.media_kind === 'gif' ? 'GIF' : post.media_kind === 'video' ? 'VIDEO' : 'IMAGE';
@@ -881,6 +1078,7 @@ async function openPostPage(postId) {
     if (descriptionMeta) {
       descriptionMeta.content = (post.description || 'View this ' + post.media_kind + ' post on imgifvid.').slice(0, 250);
     }
+    await loadPostComments(post.id);
   } catch (error) {
     console.error('Could not load post page:', error);
     message.textContent = 'We could not load this post right now. Please try again, or return to the gallery.';
