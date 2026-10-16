@@ -568,9 +568,13 @@ authForm.addEventListener('submit', async function (event) {
     authMessage.textContent = error.message || 'Something went wrong. Please try again.';
     authMessage.hidden = false;
   } finally {
+    const preservedMessage = authMessage.textContent;
     submit.disabled = false;
     renderAuthMode(state.authMode);
-    if (authMessage.textContent) authMessage.hidden = false;
+    if (preservedMessage) {
+      authMessage.textContent = preservedMessage;
+      authMessage.hidden = false;
+    }
   }
 });
 
