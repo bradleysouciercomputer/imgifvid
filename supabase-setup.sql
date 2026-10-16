@@ -122,6 +122,9 @@ create trigger on_auth_user_created_profile
   after insert on auth.users
   for each row execute procedure public.handle_new_profile();
 
+-- This function is intended for the auth.users trigger, not direct client RPC calls.
+revoke all on function public.handle_new_profile() from public, anon, authenticated;
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('avatars', 'avatars', true, 5242880,
   array['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'])
