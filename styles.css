@@ -149,6 +149,7 @@ h1, h2, h3 { font-family: 'Manrope', sans-serif; letter-spacing: -1.1px; }
 .queue-list { display: flex; flex-direction: column; gap: 8px; margin: 18px 0 20px; }
 .queue-item { display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,.025); border: 1px solid var(--line); border-radius: 12px; padding: 9px; min-width: 0; }
 .queue-thumb { width: 52px; height: 52px; flex-shrink: 0; object-fit: cover; border-radius: 8px; background: #252333; }
+.queue-video-thumb { display: grid; place-items: center; color: var(--lavender); font-size: 15px; }
 .queue-file-meta { min-width: 0; flex: 1; }
 .queue-file-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 600; }
 .queue-file-size { display: block; color: #898398; font-size: 10px; margin-top: 3px; }
