@@ -54,6 +54,92 @@ grant usage on schema public to anon, authenticated;
 grant select on public.media_posts to anon, authenticated;
 grant insert, delete on public.media_posts to authenticated;
 
+-- Public user profiles, editable only by the profile owner.
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text not null default 'Member'
+    check (char_length(display_name) between 1 and 32 and char_length(trim(display_name)) > 0),
+  bio text not null default ''
+    check (char_length(bio) <= 280),
+  avatar_path text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint profiles_avatar_owner_path_check
+    check (avatar_path is null or avatar_path like (id::text || '/%'))
+);
+
+alter table public.profiles enable row level security;
+
+drop policy if exists "Public profiles are viewable by everyone" on public.profiles;
+create policy "Public profiles are viewable by everyone"
+  on public.profiles for select to anon, authenticated using (true);
+
+drop policy if exists "Users can create their own profile" on public.profiles;
+create policy "Users can create their own profile"
+  on public.profiles for insert to authenticated
+  with check ((select auth.uid()) = id);
+
+drop policy if exists "Users can update their own profile" on public.profiles;
+create policy "Users can update their own profile"
+  on public.profiles for update to authenticated
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
+
+grant select on public.profiles to anon, authenticated;
+grant insert, update on public.profiles to authenticated;
+
+insert into public.profiles (id, display_name)
+select
+  u.id,
+  left(coalesce(
+    nullif(btrim(u.raw_user_meta_data ->> 'display_name'), ''),
+    nullif(split_part(coalesce(u.email, ''), '@', 1), ''),
+    'Member'
+  ), 32)
+from auth.users u
+on conflict (id) do nothing;
+
+create or replace function public.handle_new_profile()
+returns trigger language plpgsql security definer set search_path = ''
+as $
+begin
+  insert into public.profiles (id, display_name)
+  values (
+    new.id,
+    left(coalesce(
+      nullif(btrim(new.raw_user_meta_data ->> 'display_name'), ''),
+      nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+      'Member'
+    ), 32)
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$;
+
+drop trigger if exists on_auth_user_created_profile on auth.users;
+create trigger on_auth_user_created_profile
+  after insert on auth.users
+  for each row execute procedure public.handle_new_profile();
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'])
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Users upload their own avatars" on storage.objects;
+create policy "Users upload their own avatars"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
+drop policy if exists "Users delete their own avatars" on storage.objects;
+create policy "Users delete their own avatars"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
 -- Comments belong to a single post and are removed automatically with it.
 create table if not exists public.post_comments (
   id uuid primary key default gen_random_uuid(),
