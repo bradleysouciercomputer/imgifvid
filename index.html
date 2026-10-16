@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101016">
+  <meta name="description" content="A home for your images, animated GIFs, and short videos. Upload, discover, and share with imgifvid.">
+  <title>imgifvid — your media, in motion</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="imgifvid home">
+      <span class="brand-symbol" aria-hidden="true">
+        <svg viewBox="0 0 42 42" fill="none"><rect x="2" y="2" width="38" height="38" rx="13" fill="url(#brand-gradient)"/><path d="M11 27.5 18 19l4.8 5.3 3.4-3.8 5.8 7H11Z" fill="white" fill-opacity=".96"/><circle cx="27.8" cy="14.2" r="3.2" fill="white"/><defs><linearGradient id="brand-gradient" x1="3" y1="2" x2="39" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#B69CFF"/><stop offset=".52" stop-color="#7863F5"/><stop offset="1" stop-color="#FA7DA4"/></linearGradient></defs></svg>
+      </span>
+      <span class="brand-word">imgifvid<span class="brand-period">.</span></span>
+    </a>
+    <nav class="topnav" aria-label="Main navigation">
+      <a class="nav-link active" href="#discover">Discover</a>
+      <a class="nav-link" href="#upload-section">Upload</a>
+    </nav>
+    <div class="top-actions">
+      <span class="user-pill" id="user-pill" hidden><span class="user-dot"></span><span id="user-email"></span></span>
+      <button class="button button-quiet" id="auth-open" type="button">Sign in <span aria-hidden="true">↗</span></button>
+      <button class="button button-quiet" id="sign-out" type="button" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-spark">✳</span> YOUR LITTLE CORNER OF THE INTERNET</div>
+        <h1 id="hero-title">Your moments,<br><span>in motion.</span></h1>
+        <p>One home for the images you love, the GIFs that say it all, and the short videos worth keeping.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#upload-section">Share something <span aria-hidden="true">↗</span></a>
+          <a class="text-link" href="#discover">Explore the gallery <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="hero-proof"><span class="proof-icon">✦</span> Made for the things you want to share.</div>
+      </div>
+      <div class="hero-art" aria-label="Abstract preview of a photo, GIF, and video">
+        <div class="art-orbit orbit-a"></div><div class="art-orbit orbit-b"></div>
+        <div class="art-card art-card-back">
+          <div class="art-landscape"><span class="sun"></span><span class="mountain mountain-one"></span><span class="mountain mountain-two"></span></div>
+          <span class="art-label">a moment to keep</span>
+        </div>
+        <div class="art-card art-card-front">
+          <div class="art-image">
+            <span class="art-shape shape-one"></span><span class="art-shape shape-two"></span>
+            <span class="art-shape shape-three"></span><span class="art-image-tag">IMG</span>
+          </div>
+          <div class="art-card-caption"><span class="caption-dot"></span><span>Little things, big feelings.</span></div>
+        </div>
+        <div class="floating-chip chip-gif"><span class="chip-spark">✳</span><span>GIF</span><span class="chip-live"></span></div>
+        <div class="floating-chip chip-video"><span class="play-mini">▶</span><span>VIDEO</span><span class="chip-length">0:12</span></div>
+        <div class="floating-star star-one">✳</div><div class="floating-star star-two">✦</div>
+      </div>
+      <div class="format-line" aria-label="Supported formats">
+        <span class="format-intro">THE GOOD STUFF, IN ANY FORMAT</span>
+        <span class="format-item"><span class="format-emoji">▧</span> Images</span>
+        <span class="format-item"><span class="format-emoji">✳</span> GIFs</span>
+        <span class="format-item"><span class="format-emoji">▷</span> Short videos</span>
+        <span class="format-limit">Up to 100 MB per file</span>
+      </div>
+    </section>
+
+    <section class="section-wrap upload-section" id="upload-section" aria-labelledby="upload-title">
+      <div class="section-heading">
+        <div><div class="section-kicker">01 / ADD TO THE MIX</div><h2 id="upload-title">Drop it like it's <span>yours.</span></h2></div>
+        <p>Pick a file, give it a little context, and send it out into the world.</p>
+      </div>
+      <div class="upload-layout">
+        <div class="upload-main">
+          <button class="dropzone" id="dropzone" type="button">
+            <span class="drop-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M16 21V5m0 0-6 6m6-6 6 6M6 19v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="drop-title">Drag, drop, or <span>browse files</span></span>
+            <span class="drop-subtitle">Images, animated GIFs, MP4, WebM, or MOV</span>
+            <span class="drop-types"><span>JPG</span><span>PNG</span><span>WEBP</span><span>GIF</span><span>MP4</span><span>WEBM</span></span>
+            <span class="drop-note" id="upload-note">Sign in to upload and manage your posts.</span>
+          </button>
+          <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,video/mp4,video/webm,video/quicktime" multiple hidden>
+          <div class="queue-panel" id="queue-panel" hidden>
+            <div class="queue-header"><div><span class="section-kicker">READY WHEN YOU ARE</span><h3>Upload queue <span id="queue-count"></span></h3></div><button class="small-text-button" id="clear-queue" type="button">Clear all</button></div>
+            <div class="queue-list" id="queue-list"></div>
+            <div class="upload-fields">
+              <label for="upload-title">Title <span class="label-note">optional</span><input id="upload-title" type="text" maxlength="120" placeholder="Give this post a name"></label>
+              <label for="upload-description">Caption <span class="label-note">optional</span><textarea id="upload-description" maxlength="500" rows="2" placeholder="Add a little context…"></textarea></label>
+            </div>
+            <div class="queue-footer"><span class="privacy-note"><span class="privacy-lock">◉</span> Shared uploads are public.</span><button class="button button-primary" id="upload-submit" type="button">Upload files <span aria-hidden="true">↗</span></button></div>
+            <div class="upload-progress" id="upload-progress" hidden><span></span></div>
+          </div>
+        </div>
+        <aside class="upload-aside">
+          <div class="aside-icon aside-icon-lavender">✳</div><h3>Keep it light.</h3><p>Share the funny, the beautiful, the oddly specific. Your gallery is better with you in it.</p>
+          <div class="aside-rule"></div>
+          <div class="aside-stat"><span class="stat-number">01</span><span><strong>Sign in</strong><small>Use your email and password.</small></span></div>
+          <div class="aside-stat"><span class="stat-number">02</span><span><strong>Choose your files</strong><small>Images, GIFs, and short videos.</small></span></div>
+          <div class="aside-stat"><span class="stat-number">03</span><span><strong>Share the moment</strong><small>Your post joins the public gallery.</small></span></div>
+          <div class="public-note"><span aria-hidden="true">ⓘ</span><span>Uploads are public and can be viewed by anyone. Only upload files you have the right to share.</span></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-wrap gallery-section" id="discover" aria-labelledby="gallery-title">
+      <div class="section-heading gallery-heading">
+        <div><div class="section-kicker">02 / THE COMMUNITY MIX</div><h2 id="gallery-title">Fresh from the <span>gallery.</span></h2></div>
+        <p>A little inspiration from everyone else. Find something good, or add your own.</p>
+      </div>
+      <div class="gallery-toolbar">
+        <div class="filter-tabs" role="group" aria-label="Filter gallery">
+          <button class="filter-tab active" data-filter="all" type="button" aria-pressed="true">Everything <span id="all-count">—</span></button>
+          <button class="filter-tab" data-filter="image" type="button" aria-pressed="false">Images</button>
+          <button class="filter-tab" data-filter="gif" type="button" aria-pressed="false">GIFs</button>
+          <button class="filter-tab" data-filter="video" type="button" aria-pressed="false">Videos</button>
+        </div>
+        <label class="search-box"><span aria-hidden="true">⌕</span><input id="gallery-search" type="search" placeholder="Find a moment…" aria-label="Search gallery"></label>
+      </div>
+      <div class="feed-message" id="feed-message" role="status" hidden></div>
+      <div class="gallery-grid" id="gallery-grid" aria-live="polite"></div>
+      <div class="empty-state" id="empty-state" hidden><div class="empty-art">✳</div><h3>It's a little quiet in here.</h3><p>Be the first to add something worth a second look.</p><a class="button button-primary" href="#upload-section">Add the first post <span aria-hidden="true">↗</span></a></div>
+      <div class="gallery-footer"><span>GOOD THINGS ARE MEANT TO BE SHARED.</span><button class="text-link" id="refresh-feed" type="button">Refresh gallery ↻</button></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <a class="brand footer-brand" href="#top"><span class="brand-symbol" aria-hidden="true"><svg viewBox="0 0 42 42" fill="none"><rect x="2" y="2" width="38" height="38" rx="13" fill="url(#footer-gradient)"/><path d="M11 27.5 18 19l4.8 5.3 3.4-3.8 5.8 7H11Z" fill="white"/><circle cx="27.8" cy="14.2" r="3.2" fill="white"/><defs><linearGradient id="footer-gradient" x1="3" y1="2" x2="39" y2="40"><stop stop-color="#B69CFF"/><stop offset="1" stop-color="#FA7DA4"/></linearGradient></defs></svg></span><span class="brand-word">imgifvid<span class="brand-period">.</span></span></a>
+    <span class="footer-note">A small home for your favorite pixels.</span>
+    <a href="#top" class="back-top">Back to top ↑</a>
+  </footer>
+
+  <dialog class="site-dialog auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
+    <div class="dialog-top"><a class="brand" href="#top"><span class="brand-symbol" aria-hidden="true"><svg viewBox="0 0 42 42" fill="none"><rect x="2" y="2" width="38" height="38" rx="13" fill="url(#auth-gradient)"/><path d="M11 27.5 18 19l4.8 5.3 3.4-3.8 5.8 7H11Z" fill="white"/><circle cx="27.8" cy="14.2" r="3.2" fill="white"/><defs><linearGradient id="auth-gradient" x1="3" y1="2" x2="39" y2="40"><stop stop-color="#B69CFF"/><stop offset="1" stop-color="#FA7DA4"/></linearGradient></defs></svg></span><span class="brand-word">imgifvid<span class="brand-period">.</span></span></a><button class="icon-button" id="auth-close" type="button" aria-label="Close sign in dialog">×</button></div>
+    <div class="auth-content">
+      <div class="section-kicker" id="auth-kicker">GOOD TO SEE YOU</div>
+      <h2 id="auth-title">Welcome <span>back.</span></h2>
+      <p id="auth-subtitle">Sign in to share a moment or manage your posts.</p>
+      <form id="auth-form">
+        <label for="auth-email">Email address<input id="auth-email" name="email" type="email" placeholder="you@example.com" autocomplete="email" required></label>
+        <label for="auth-password" id="password-field">Password<input id="auth-password" name="password" type="password" minlength="8" placeholder="At least 8 characters" autocomplete="current-password" required></label>
+        <div class="auth-error" id="auth-message" role="status" hidden></div>
+        <button class="button button-primary auth-submit" id="auth-submit" type="submit">Sign in <span aria-hidden="true">↗</span></button>
+      </form>
+      <button class="auth-link" id="forgot-password" type="button">Forgot your password?</button>
+      <div class="auth-switch" id="auth-switch"><span>New around here?</span> <button type="button" id="auth-switch-button">Create an account</button></div>
+    </div>
+  </dialog>
+
+  <dialog class="site-dialog preview-dialog" id="preview-dialog" aria-labelledby="preview-title">
+    <div class="dialog-top preview-top"><div><div class="section-kicker" id="preview-kicker">FROM THE GALLERY</div><h2 id="preview-title">A little moment.</h2></div><button class="icon-button" id="preview-close" type="button" aria-label="Close preview">×</button></div>
+    <div class="preview-stage" id="preview-stage"></div>
+    <p class="preview-description" id="preview-description"></p>
+    <div class="preview-meta"><span id="preview-date"></span><span id="preview-owner"></span></div>
+    <div class="preview-actions"><a class="button button-secondary" id="preview-download" href="#" target="_blank" rel="noopener noreferrer" download>Open original ↗</a><button class="button button-danger" id="preview-delete" type="button" hidden>Delete my post</button></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
