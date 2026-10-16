@@ -494,6 +494,44 @@ async function copyShareLink(postId) {
   }
 }
 
+async function removeMediaObjectAndVerify(storagePath) {
+  const storage = supabase.storage.from(BUCKET);
+  const lastSlash = storagePath.lastIndexOf('/');
+  const folder = lastSlash >= 0 ? storagePath.slice(0, lastSlash) : '';
+  const fileName = lastSlash >= 0 ? storagePath.slice(lastSlash + 1) : storagePath;
+
+  async function objectStillExists() {
+    const result = await storage.list(folder, {
+      limit: 100,
+      search: fileName
+    });
+    if (result.error) {
+      throw new Error('Could not verify the media file was removed: ' + result.error.message);
+    }
+    return (result.data || []).some(function (entry) {
+      return entry.name === fileName;
+    });
+  }
+
+  // Storage can return an empty successful response when the object is filtered
+  // by a policy. Verify the actual object listing before deleting its DB row.
+  const firstRemoval = await storage.remove([storagePath]);
+  let stillExists = await objectStillExists();
+  if (!stillExists) return;
+
+  // Retry once to recover from transient Storage failures.
+  const secondRemoval = await storage.remove([storagePath]);
+  stillExists = await objectStillExists();
+  if (stillExists) {
+    const reason = secondRemoval.error || firstRemoval.error;
+    throw new Error(
+      reason
+        ? 'The media file could not be removed from Storage: ' + reason.message
+        : 'Storage did not remove the media file. The post was kept so you can retry.'
+    );
+  }
+}
+
 async function deletePreviewPost() {
   const post = state.previewPost;
   if (!post || !state.user || post.user_id !== state.user.id) return;
@@ -503,8 +541,8 @@ async function deletePreviewPost() {
   button.disabled = true;
   button.textContent = 'Deleting…';
   try {
-    const storageResult = await supabase.storage.from(BUCKET).remove([post.storage_path]);
-    if (storageResult.error) throw storageResult.error;
+    // Do not delete the gallery row until Storage confirms the object is gone.
+    await removeMediaObjectAndVerify(post.storage_path);
     const rowResult = await supabase.from('media_posts').delete().eq('id', post.id);
     if (rowResult.error) throw rowResult.error;
     $('#preview-dialog').close();
