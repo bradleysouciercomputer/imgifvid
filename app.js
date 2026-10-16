@@ -656,9 +656,11 @@ $('#preview-dialog').addEventListener('close', function () {
 supabase.auth.onAuthStateChange(function (event, session) {
   state.user = session ? session.user : null;
   updateAuthUI();
-  window.setTimeout(function () {
-    loadPosts();
-  }, 0);
+  if (['INITIAL_SESSION', 'SIGNED_IN', 'SIGNED_OUT', 'PASSWORD_RECOVERY', 'USER_UPDATED'].includes(event)) {
+    window.setTimeout(function () {
+      loadPosts();
+    }, 0);
+  }
   if (event === 'PASSWORD_RECOVERY') {
     openAuth('update');
   }
