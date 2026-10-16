@@ -800,7 +800,7 @@ async function cleanupOrphanedAvatarObjects() {
   }
 }
 
-function deletePreviewPost() {
+async function deletePreviewPost() {
   const post = state.postPagePost || state.previewPost;
   if (!post || !state.user || post.user_id !== state.user.id) return;
   const deletingFromPostPage = Boolean(state.postPagePost && state.postPagePost.id === post.id);
