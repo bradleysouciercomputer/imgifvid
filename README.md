@@ -5,6 +5,7 @@ A static image, GIF, and short-video sharing site for GitHub Pages. The front en
 ## Features
 
 - Email/password account creation, sign-in, sign-out, and password reset.
+- Public profiles with editable display names, bios, and uploaded avatars.
 - Upload multiple images, animated GIFs, and short videos.
 - File queue with local previews, optional title and caption, and upload progress.
 - Public gallery with image/GIF/video filters, search, standalone shareable post pages, public comments, direct media links, and deletion of your own posts.
@@ -52,6 +53,10 @@ Each media post has its own imgifvid detail page. Opening a gallery card navigat
 `https://bradleysouciercomputer.github.io/imgifvid/?post=<post-id>`
 
 This query-based route works with GitHub Pages static hosting and can be opened directly by anyone. The detail page shows the media, title, caption, upload date and file size, with actions to copy the post link or open the original file. Authenticated owners also see a delete action.
+
+## Profiles
+
+Signed-in users can open **My profile** from the top navigation to edit their display name, bio, and profile picture. Public profiles have URLs in the format `?profile=<user-id>`; profile pages list that member's posts. Comment authors link to their profiles and use the profile display name/avatar. Existing accounts are backfilled with a default display name from their email address. Profile pictures are stored in the public `avatars` Storage bucket (5 MB maximum).
 
 ## Comments
 
