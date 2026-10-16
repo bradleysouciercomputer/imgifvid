@@ -7,7 +7,7 @@ A static image, GIF, and short-video sharing site for GitHub Pages. The front en
 - Email/password account creation, sign-in, sign-out, and password reset.
 - Upload multiple images, animated GIFs, and short videos.
 - File queue with local previews, optional title and caption, and upload progress.
-- Public gallery with image/GIF/video filters, search, previews, direct media links, and deletion of your own posts.
+- Public gallery with image/GIF/video filters, search, standalone shareable post pages, direct media links, and deletion of your own posts.
 - Responsive layout for desktop and mobile.
 - No build step or private server required.
 
@@ -44,6 +44,14 @@ The setup creates:
 - Public read access to gallery metadata.
 - Authenticated-only post creation and ownership-checked deletion.
 - Storage rules that limit uploads/deletes to the signed-in user's own folder.
+
+## Shareable post pages
+
+Each media post has its own imgifvid detail page. Opening a gallery card navigates to the post page, and the Share action copies an imgifvid URL in this format:
+
+`https://bradleysouciercomputer.github.io/imgifvid/?post=<post-id>`
+
+This query-based route works with GitHub Pages static hosting and can be opened directly by anyone. The detail page shows the media, title, caption, upload date and file size, with actions to copy the post link or open the original file. Authenticated owners also see a delete action.
 
 ## Public media notice
 
