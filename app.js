@@ -23,8 +23,13 @@ const state = {
   queue: [],
   previewPost: null,
   postPagePost: null,
+  profilePageId: null,
+  myProfile: null,
+  profilesById: Object.create(null),
   postComments: [],
   commentSubmitting: false,
+  savingProfile: false,
+  avatarPreviewUrl: null,
   authMode: 'signin',
   loadingFeed: false,
   uploading: false
@@ -89,6 +94,24 @@ function getSiteUrl() {
 
 function getPublicUrl(path) {
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+function getAvatarUrl(path) {
+  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+}
+
+function getProfileUrl(profileId) {
+  const url = new URL(getSiteUrl(), window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('profile', profileId);
+  return url.href;
+}
+
+function getInitials(name) {
+  const parts = String(name || 'Member').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'M';
+  return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase();
 }
 
 function getPostUrl(postId) {
@@ -157,12 +180,61 @@ function updateAuthUI() {
   const isSignedIn = Boolean(state.user);
   $('#auth-open').hidden = isSignedIn;
   $('#sign-out').hidden = !isSignedIn;
+  $('#profile-open').hidden = !isSignedIn;
   $('#user-pill').hidden = !isSignedIn;
-  $('#user-email').textContent = isSignedIn ? (state.user.email || 'Signed in') : '';
+  $('#user-email').textContent = isSignedIn
+    ? (state.myProfile?.display_name || state.user.email || 'Signed in')
+    : '';
   $('#upload-note').textContent = isSignedIn
     ? 'Signed in and ready. Add up to 10 files at a time.'
     : 'You can choose files now; sign in before uploading.';
   renderCommentComposer();
+}
+
+async function loadMyProfile() {
+  if (!state.user) {
+    state.myProfile = null;
+    updateAuthUI();
+    return null;
+  }
+  const userId = state.user.id;
+  const result = await supabase.from('profiles')
+    .select('id,display_name,bio,avatar_path,created_at,updated_at')
+    .eq('id', userId)
+    .maybeSingle();
+  if (result.error) throw result.error;
+
+  let profile = result.data;
+  if (!profile) {
+    const suggestedName = (state.user.email || 'Member').split('@')[0].trim().slice(0, 32) || 'Member';
+    const inserted = await supabase.from('profiles').insert({
+      id: userId,
+      display_name: suggestedName,
+      bio: ''
+    }).select('id,display_name,bio,avatar_path,created_at,updated_at').single();
+    if (inserted.error) throw inserted.error;
+    profile = inserted.data;
+  }
+
+  state.myProfile = profile;
+  state.profilesById[profile.id] = profile;
+  updateAuthUI();
+  return profile;
+}
+
+async function loadProfiles(userIds) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  const missing = ids.filter(function (id) { return !state.profilesById[id]; });
+  if (!missing.length) return state.profilesById;
+
+  const result = await supabase.from('profiles')
+    .select('id,display_name,bio,avatar_path,created_at,updated_at')
+    .in('id', missing);
+  if (result.error) throw result.error;
+  for (const profile of result.data || []) {
+    state.profilesById[profile.id] = profile;
+  }
+  return state.profilesById;
 }
 
 function renderAuthMode(mode) {
@@ -721,6 +793,31 @@ authForm.addEventListener('submit', async function (event) {
   }
 });
 
+$('#profile-open').addEventListener('click', function () {
+  if (state.user) window.location.assign(getProfileUrl(state.user.id));
+});
+$('#profile-share').addEventListener('click', async function () {
+  if (!state.profilePageId) return;
+  const url = getProfileUrl(state.profilePageId);
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Profile link copied.');
+  } catch (error) {
+    window.prompt('Copy this profile link:', url);
+  }
+});
+$('#profile-form').addEventListener('submit', saveProfile);
+$('#profile-avatar-input').addEventListener('change', function (event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (state.avatarPreviewUrl) URL.revokeObjectURL(state.avatarPreviewUrl);
+  state.avatarPreviewUrl = URL.createObjectURL(file);
+  const image = $('#profile-page-avatar');
+  image.src = state.avatarPreviewUrl;
+  image.alt = 'New profile picture preview';
+  image.hidden = false;
+  $('#profile-page-avatar-fallback').hidden = true;
+});
 $('#auth-open').addEventListener('click', function () { openAuth('signin'); });
 $('#sign-out').addEventListener('click', async function () {
   const result = await supabase.auth.signOut();
@@ -813,11 +910,19 @@ $('#preview-dialog').addEventListener('close', function () {
 supabase.auth.onAuthStateChange(function (event, session) {
   state.user = session ? session.user : null;
   updateAuthUI();
+  if (!state.user) {
+    state.myProfile = null;
+    updateAuthUI();
+  }
   if (['INITIAL_SESSION', 'SIGNED_IN', 'SIGNED_OUT', 'PASSWORD_RECOVERY', 'USER_UPDATED'].includes(event)) {
-    window.setTimeout(function () {
+    window.setTimeout(async function () {
       loadPosts();
-      if (state.user) cleanupOrphanedMediaObjects();
+      if (state.user) {
+        cleanupOrphanedMediaObjects();
+        try { await loadMyProfile(); } catch (error) { console.warn('Could not load signed-in profile:', error); }
+      }
       if (state.postPagePost) loadPostComments(state.postPagePost.id);
+      if (state.profilePageId) openProfilePage(state.profilePageId);
     }, 0);
   }
   if (event === 'PASSWORD_RECOVERY') {
@@ -872,14 +977,27 @@ function renderComments(comments) {
     const identity = document.createElement('div');
     identity.className = 'comment-identity';
 
+    const profile = state.profilesById[comment.user_id] || null;
+    const displayName = profile?.display_name || 'Member';
+
     const avatar = document.createElement('span');
     avatar.className = 'comment-avatar';
-    avatar.textContent = comment.user_id === (state.user && state.user.id) ? 'Y' : '✳';
     avatar.setAttribute('aria-hidden', 'true');
+    if (profile?.avatar_path) {
+      const image = document.createElement('img');
+      image.src = getAvatarUrl(profile.avatar_path);
+      image.alt = '';
+      image.loading = 'lazy';
+      avatar.appendChild(image);
+    } else {
+      avatar.textContent = getInitials(displayName);
+    }
 
-    const author = document.createElement('span');
+    const author = document.createElement('a');
     author.className = 'comment-author';
-    author.textContent = comment.user_id === (state.user && state.user.id) ? 'You' : 'Community member';
+    author.href = getProfileUrl(comment.user_id);
+    author.textContent = displayName;
+    author.title = 'View ' + displayName + "'s profile";
 
     const time = document.createElement('time');
     time.className = 'comment-time';
@@ -925,6 +1043,11 @@ async function loadPostComments(postId) {
     if (result.error) throw result.error;
     if (!state.postPagePost || state.postPagePost.id !== postId) return;
     state.postComments = result.data || [];
+    try {
+      await loadProfiles(state.postComments.map(function (comment) { return comment.user_id; }));
+    } catch (profileError) {
+      console.warn('Could not load commenter profiles:', profileError);
+    }
     renderComments(state.postComments);
     setCommentMessage('', false);
   } catch (error) {
@@ -1086,16 +1209,237 @@ async function openPostPage(postId) {
   }
 }
 
+function renderProfilePosts(posts) {
+  const grid = $('#profile-posts-grid');
+  const empty = $('#profile-empty-posts');
+  grid.replaceChildren();
+  $('#profile-page-post-count').textContent = posts.length === 1 ? '1 post' : posts.length + ' posts';
+  if (!posts.length) {
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+
+  posts.forEach(function (post, index) {
+    const url = getPublicUrl(post.storage_path);
+    const title = post.title || titleFromFilename(post.original_name);
+    const kindLabel = post.media_kind === 'gif' ? 'GIF' : post.media_kind === 'video' ? 'Video' : 'Image';
+    const card = document.createElement('article');
+    card.className = 'media-card';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', 'Open ' + title);
+    card.style.animationDelay = Math.min(index * 35, 280) + 'ms';
+    const mediaElement = post.media_kind === 'video'
+      ? '<video src="' + escapeHTML(url) + '" muted playsinline preload="metadata" aria-label="' + escapeHTML(title) + ' preview"></video><span class="video-play" aria-hidden="true">▶</span>'
+      : '<img src="' + escapeHTML(url) + '" loading="lazy" alt="' + escapeHTML(title) + '">';
+    card.innerHTML =
+      '<div class="media-preview">' + mediaElement + '<span class="media-tag">' + kindLabel + '</span></div>' +
+      '<div class="media-card-body"><h3 class="media-card-title">' + escapeHTML(title) + '</h3>' +
+      '<p class="media-card-description">' + escapeHTML(post.description || '') + '</p>' +
+      '<div class="media-card-footer"><span>' + formatDate(post.created_at) + '</span><span>Open post ↗</span></div></div>';
+    card.addEventListener('click', function () { window.location.assign(getPostUrl(post.id)); });
+    card.addEventListener('keydown', function (event) {
+      if (event.target === card && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        window.location.assign(getPostUrl(post.id));
+      }
+    });
+    grid.appendChild(card);
+  });
+}
+
+async function openProfilePage(profileId) {
+  state.profilePageId = profileId;
+  $('#home-view').hidden = true;
+  $('#post-page').hidden = true;
+  $('#profile-page').hidden = false;
+  $('#profile-content').hidden = true;
+  const message = $('#profile-page-message');
+  message.hidden = false;
+  message.textContent = 'Loading profile…';
+
+  if (!profileId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId)) {
+    message.textContent = 'That profile link does not look valid. Return to the gallery to find a member.';
+    document.title = 'Profile not found — imgifvid';
+    return;
+  }
+
+  try {
+    const result = await supabase.from('profiles')
+      .select('id,display_name,bio,avatar_path,created_at,updated_at')
+      .eq('id', profileId)
+      .maybeSingle();
+    if (result.error) throw result.error;
+    if (!result.data) {
+      message.textContent = 'This profile could not be found.';
+      document.title = 'Profile not found — imgifvid';
+      return;
+    }
+
+    const profile = result.data;
+    state.profilesById[profile.id] = profile;
+    const isOwner = Boolean(state.user && state.user.id === profile.id);
+    if (isOwner) state.myProfile = profile;
+
+    const displayName = profile.display_name || 'Member';
+    $('#profile-page-name').textContent = displayName;
+    $('#profile-page-bio').textContent = profile.bio || '';
+    $('#profile-page-bio').hidden = !profile.bio;
+    $('#profile-page-joined').textContent = 'Member since ' + formatDate(profile.created_at);
+    $('#profile-share').textContent = 'Share profile ↗';
+    $('#profile-editor-section').hidden = !isOwner;
+
+    const avatarImage = $('#profile-page-avatar');
+    const avatarFallback = $('#profile-page-avatar-fallback');
+    if (profile.avatar_path) {
+      avatarImage.src = getAvatarUrl(profile.avatar_path);
+      avatarImage.alt = displayName + "'s profile picture";
+      avatarImage.hidden = false;
+      avatarFallback.hidden = true;
+    } else {
+      avatarImage.removeAttribute('src');
+      avatarImage.alt = '';
+      avatarImage.hidden = true;
+      avatarFallback.textContent = getInitials(displayName);
+      avatarFallback.hidden = false;
+    }
+
+    if (isOwner) {
+      $('#profile-display-name').value = profile.display_name || '';
+      $('#profile-bio').value = profile.bio || '';
+      $('#profile-avatar-input').value = '';
+      setProfileFormMessage('', false);
+    }
+
+    const postsResult = await supabase.from('media_posts')
+      .select('id,user_id,title,description,storage_path,original_name,mime_type,media_kind,file_size_bytes,created_at')
+      .eq('user_id', profileId)
+      .order('created_at', { ascending: false })
+      .limit(90);
+    if (postsResult.error) throw postsResult.error;
+
+    message.hidden = true;
+    $('#profile-content').hidden = false;
+    renderProfilePosts(postsResult.data || []);
+    document.title = displayName + ' — imgifvid';
+    const descriptionMeta = document.querySelector('meta[name="description"]');
+    if (descriptionMeta) descriptionMeta.content = (profile.bio || displayName + "'s profile on imgifvid.").slice(0, 250);
+    if (isOwner) updateAuthUI();
+  } catch (error) {
+    console.error('Could not load profile:', error);
+    message.textContent = 'We could not load this profile right now. Please try again.';
+    document.title = 'Profile unavailable — imgifvid';
+  }
+}
+
+function setProfileFormMessage(message, isError) {
+  const element = $('#profile-form-message');
+  element.textContent = message || '';
+  element.hidden = !message;
+  element.classList.toggle('is-error', Boolean(message && isError));
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+  if (!state.user || state.savingProfile) return;
+
+  const displayName = $('#profile-display-name').value.trim();
+  const bio = $('#profile-bio').value.trim();
+  const avatarFile = $('#profile-avatar-input').files[0] || null;
+  if (!displayName || displayName.length > 32) {
+    setProfileFormMessage('Display names must be between 1 and 32 characters.', true);
+    return;
+  }
+  if (bio.length > 280) {
+    setProfileFormMessage('Your bio must be 280 characters or fewer.', true);
+    return;
+  }
+
+  let newAvatarPath = null;
+  let oldAvatarPath = state.myProfile?.avatar_path || null;
+  const button = $('#profile-save');
+  state.savingProfile = true;
+  button.disabled = true;
+  button.textContent = 'Saving…';
+  setProfileFormMessage('', false);
+
+  try {
+    if (avatarFile) {
+      const allowed = new Set(['image/jpeg','image/png','image/webp','image/avif','image/gif']);
+      if (!allowed.has(avatarFile.type.toLowerCase())) {
+        throw new Error('Choose a JPG, PNG, WebP, AVIF, or GIF image.');
+      }
+      if (avatarFile.size <= 0 || avatarFile.size > 5 * 1024 * 1024) {
+        throw new Error('Profile pictures must be smaller than 5 MB.');
+      }
+      const extension = (avatarFile.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+      newAvatarPath = state.user.id + '/' + crypto.randomUUID() + '.' + (extension || 'png');
+      const upload = await supabase.storage.from('avatars').upload(newAvatarPath, avatarFile, {
+        cacheControl: '3600',
+        contentType: avatarFile.type,
+        upsert: false
+      });
+      if (upload.error) throw upload.error;
+    }
+
+    const updates = {
+      id: state.user.id,
+      display_name: displayName,
+      bio: bio,
+      avatar_path: newAvatarPath || oldAvatarPath,
+      updated_at: new Date().toISOString()
+    };
+    const result = await supabase.from('profiles').upsert(updates)
+      .select('id,display_name,bio,avatar_path,created_at,updated_at')
+      .single();
+    if (result.error) throw result.error;
+
+    state.myProfile = result.data;
+    state.profilesById[result.data.id] = result.data;
+    updateAuthUI();
+
+    if (newAvatarPath && oldAvatarPath && oldAvatarPath !== newAvatarPath && oldAvatarPath.startsWith(state.user.id + '/')) {
+      const removed = await supabase.storage.from('avatars').remove([oldAvatarPath]);
+      if (removed.error) console.warn('Could not remove old profile picture:', removed.error);
+    }
+
+    if (state.avatarPreviewUrl) {
+      URL.revokeObjectURL(state.avatarPreviewUrl);
+      state.avatarPreviewUrl = null;
+    }
+    showToast('Profile saved.');
+    await openProfilePage(state.user.id);
+  } catch (error) {
+    console.error('Could not save profile:', error);
+    if (newAvatarPath) {
+      const cleanup = await supabase.storage.from('avatars').remove([newAvatarPath]);
+      if (cleanup.error) console.warn('Could not clean up failed profile picture upload:', cleanup.error);
+    }
+    setProfileFormMessage(error.message || 'Your profile could not be saved. Please try again.', true);
+  } finally {
+    state.savingProfile = false;
+    button.disabled = false;
+    button.textContent = 'Save profile ↗';
+  }
+}
+
 async function boot() {
   const result = await supabase.auth.getSession();
   state.user = result.data && result.data.session ? result.data.session.user : null;
   updateAuthUI();
+  if (state.user) {
+    try { await loadMyProfile(); } catch (error) { console.warn('Could not load signed-in profile:', error); }
+  }
   renderQueue();
   await loadPosts();
   const params = new URLSearchParams(window.location.search);
   const postId = params.get('post');
+  const profileId = params.get('profile');
   if (postId) {
     await openPostPage(postId);
+  } else if (profileId) {
+    await openProfilePage(profileId);
   }
   if (params.has('reset-password')) {
     openAuth('update');
