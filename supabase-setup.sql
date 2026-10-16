@@ -17,6 +17,12 @@ create table if not exists public.media_posts (
   created_at timestamptz not null default now()
 );
 
+alter table public.media_posts
+  drop constraint if exists media_posts_storage_path_owner_check;
+alter table public.media_posts
+  add constraint media_posts_storage_path_owner_check
+  check (storage_path like (user_id::text || '/%'));
+
 create index if not exists media_posts_created_at_idx
   on public.media_posts (created_at desc);
 create index if not exists media_posts_kind_created_at_idx
