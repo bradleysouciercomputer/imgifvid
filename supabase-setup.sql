@@ -86,7 +86,6 @@ create policy "Members can list their own media files"
   using (
     bucket_id = 'media'
     and (storage.foldername(name))[1] = (select auth.uid()::text)
-    and storage.allow_only_operation('object.list')
   );
 
 drop policy if exists "Members delete files in their own media folder" on storage.objects;
