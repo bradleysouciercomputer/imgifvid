@@ -476,3 +476,11 @@ h1, h2, h3 { font-family: 'Manrope', sans-serif; letter-spacing: -1.1px; }
   .profile-form-footer .button { width: 100%; }
   .profile-posts-section { padding-top: 45px; }
 }
+
+
+/* Profile avatar removal */
+.profile-avatar-remove {
+  grid-column: 1 / -1;
+  justify-self: start;
+  font-size: 11px;
+}
