@@ -52,6 +52,7 @@ const passwordField = $('#password-field');
 const toast = $('#toast');
 let toastTimer = null;
 let orphanCleanupRunning = false;
+let orphanAvatarCleanupRunning = false;
 
 const MIME_BY_EXT = {
   jpg: 'image/jpeg',
@@ -622,6 +623,44 @@ async function removeMediaObjectAndVerify(storagePath) {
   }
 }
 
+async function removeAvatarObjectAndVerify(storagePath) {
+  const ownerId = state.user && state.user.id;
+  const lastSlash = typeof storagePath === 'string' ? storagePath.lastIndexOf('/') : -1;
+  const folder = lastSlash >= 0 ? storagePath.slice(0, lastSlash) : '';
+  const fileName = lastSlash >= 0 ? storagePath.slice(lastSlash + 1) : '';
+
+  if (!ownerId || folder !== ownerId || !fileName) {
+    throw new Error('You can only remove your own profile picture.');
+  }
+
+  const storage = supabase.storage.from('avatars');
+
+  async function objectStillExists() {
+    const result = await storage.list(folder, { limit: 100, search: fileName });
+    if (result.error) {
+      throw new Error('Could not verify that the profile picture was removed from Storage: ' + result.error.message);
+    }
+    return (result.data || []).some(function (entry) {
+      return entry.name === fileName && Boolean(entry.id || entry.metadata);
+    });
+  }
+
+  const firstRemoval = await storage.remove([storagePath]);
+  let stillExists = await objectStillExists();
+  if (!stillExists) return;
+
+  const secondRemoval = await storage.remove([storagePath]);
+  stillExists = await objectStillExists();
+  if (stillExists) {
+    const reason = secondRemoval.error || firstRemoval.error;
+    throw new Error(
+      reason
+        ? 'The profile picture is still in Storage: ' + reason.message
+        : 'Storage did not remove the profile picture. It was kept linked to your profile so you can retry.'
+    );
+  }
+}
+
 async function cleanupOrphanedMediaObjects() {
   // A removed gallery row can leave a raw Storage object behind if an older
   // delete path only removed the database record. Limit cleanup to this signed-in
@@ -698,7 +737,70 @@ async function cleanupOrphanedMediaObjects() {
   }
 }
 
-async function deletePreviewPost() {
+async async function cleanupOrphanedAvatarObjects() {
+  if (!state.user || orphanAvatarCleanupRunning) return;
+  orphanAvatarCleanupRunning = true;
+  const ownerId = state.user.id;
+
+  try {
+    const profileResult = await supabase.from('profiles')
+      .select('avatar_path')
+      .eq('id', ownerId)
+      .maybeSingle();
+    if (profileResult.error) throw profileResult.error;
+    const currentAvatarPath = profileResult.data ? profileResult.data.avatar_path : null;
+
+    const ownerFiles = [];
+    let fileOffset = 0;
+    const filePageSize = 100;
+    const storage = supabase.storage.from('avatars');
+
+    while (true) {
+      const listed = await storage.list(ownerId, {
+        limit: filePageSize,
+        offset: fileOffset,
+        sortBy: { column: 'name', order: 'asc' }
+      });
+      if (listed.error) throw listed.error;
+      const entries = listed.data || [];
+      ownerFiles.push(...entries.filter(function (entry) {
+        return Boolean(entry.id || entry.metadata);
+      }));
+      if (entries.length < filePageSize) break;
+      fileOffset += entries.length;
+    }
+
+    let removedCount = 0;
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    for (const file of ownerFiles) {
+      if (state.user?.id !== ownerId) return;
+      const path = ownerId + '/' + file.name;
+      if (path === currentAvatarPath) continue;
+
+      // Preserve recent uploads to avoid racing the profile save request.
+      const createdAt = Date.parse(file.created_at || '');
+      if (!Number.isFinite(createdAt) || createdAt > oneHourAgo) continue;
+
+      try {
+        await removeAvatarObjectAndVerify(path);
+        removedCount += 1;
+      } catch (error) {
+        console.warn('Could not remove an orphaned profile picture:', path, error);
+      }
+    }
+
+    if (removedCount > 0) {
+      console.info('Removed ' + removedCount + ' orphaned avatar Storage object(s).');
+      showToast(removedCount + ' old profile picture file(s) cleaned up.');
+    }
+  } catch (error) {
+    console.warn('Could not clean orphaned profile pictures:', error);
+  } finally {
+    orphanAvatarCleanupRunning = false;
+  }
+}
+
+function deletePreviewPost() {
   const post = state.postPagePost || state.previewPost;
   if (!post || !state.user || post.user_id !== state.user.id) return;
   const deletingFromPostPage = Boolean(state.postPagePost && state.postPagePost.id === post.id);
@@ -807,6 +909,7 @@ $('#profile-share').addEventListener('click', async function () {
   }
 });
 $('#profile-form').addEventListener('submit', saveProfile);
+$('#profile-avatar-remove').addEventListener('click', removeProfilePhoto);
 $('#profile-avatar-input').addEventListener('change', function (event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -919,7 +1022,12 @@ supabase.auth.onAuthStateChange(function (event, session) {
       loadPosts();
       if (state.user) {
         cleanupOrphanedMediaObjects();
-        try { await loadMyProfile(); } catch (error) { console.warn('Could not load signed-in profile:', error); }
+        try {
+          await loadMyProfile();
+          await cleanupOrphanedAvatarObjects();
+        } catch (error) {
+          console.warn('Could not load signed-in profile or clean up avatar Storage:', error);
+        }
       }
       if (state.postPagePost) loadPostComments(state.postPagePost.id);
       if (state.profilePageId) openProfilePage(state.profilePageId);
@@ -1292,6 +1400,7 @@ async function openProfilePage(profileId) {
 
     const avatarImage = $('#profile-page-avatar');
     const avatarFallback = $('#profile-page-avatar-fallback');
+    $('#profile-avatar-remove').hidden = !isOwner || !profile.avatar_path;
     if (profile.avatar_path) {
       avatarImage.src = getAvatarUrl(profile.avatar_path);
       avatarImage.alt = displayName + "'s profile picture";
@@ -1357,11 +1466,14 @@ async function saveProfile(event) {
   }
 
   let newAvatarPath = null;
-  let oldAvatarPath = state.myProfile?.avatar_path || null;
+  const oldAvatarPath = state.myProfile?.avatar_path || null;
+  let profileSaved = false;
+  let avatarCleanupError = null;
   const button = $('#profile-save');
   state.savingProfile = true;
   button.disabled = true;
   button.textContent = 'Saving…';
+  $('#profile-avatar-remove').disabled = true;
   setProfileFormMessage('', false);
 
   try {
@@ -1395,35 +1507,146 @@ async function saveProfile(event) {
       .single();
     if (result.error) throw result.error;
 
+    profileSaved = true;
     state.myProfile = result.data;
     state.profilesById[result.data.id] = result.data;
     updateAuthUI();
 
-    if (newAvatarPath && oldAvatarPath && oldAvatarPath !== newAvatarPath && oldAvatarPath.startsWith(state.user.id + '/')) {
-      const removed = await supabase.storage.from('avatars').remove([oldAvatarPath]);
-      if (removed.error) console.warn('Could not remove old profile picture:', removed.error);
+    // The new photo is now live. Verify that the replaced file is actually gone;
+    // don't delete the new photo if cleanup of the previous one fails.
+    if (newAvatarPath && oldAvatarPath && oldAvatarPath !== newAvatarPath) {
+      try {
+        await removeAvatarObjectAndVerify(oldAvatarPath);
+      } catch (error) {
+        avatarCleanupError = error;
+        console.error('Could not remove the replaced profile picture:', error);
+      }
     }
 
     if (state.avatarPreviewUrl) {
       URL.revokeObjectURL(state.avatarPreviewUrl);
       state.avatarPreviewUrl = null;
     }
-    showToast('Profile saved.');
     await openProfilePage(state.user.id);
+    if (avatarCleanupError) {
+      setProfileFormMessage(
+        'Profile saved, but the previous photo could not be removed from Storage. It will be retried during cleanup. ' +
+        (avatarCleanupError.message || ''),
+        true
+      );
+      showToast('Profile saved, but old photo cleanup failed.');
+    } else {
+      showToast('Profile saved.');
+    }
   } catch (error) {
     console.error('Could not save profile:', error);
-    if (newAvatarPath) {
-      const cleanup = await supabase.storage.from('avatars').remove([newAvatarPath]);
-      if (cleanup.error) console.warn('Could not clean up failed profile picture upload:', cleanup.error);
+    if (newAvatarPath && !profileSaved) {
+      try {
+        await removeAvatarObjectAndVerify(newAvatarPath);
+      } catch (cleanupError) {
+        console.warn('Could not clean up failed profile picture upload:', cleanupError);
+      }
     }
     setProfileFormMessage(error.message || 'Your profile could not be saved. Please try again.', true);
   } finally {
     state.savingProfile = false;
     button.disabled = false;
     button.textContent = 'Save profile ↗';
+    $('#profile-avatar-remove').disabled = false;
   }
 }
 
+async function removeProfilePhoto() {
+  if (!state.user || state.savingProfile) return;
+  const ownerId = state.user.id;
+  const oldAvatarPath = state.myProfile?.avatar_path || null;
+  if (!oldAvatarPath) {
+    showToast('You do not have a saved profile photo to remove.');
+    return;
+  }
+  if (!window.confirm('Remove your profile photo? The image file will also be deleted from Storage.')) return;
+
+  const saveButton = $('#profile-save');
+  const removeButton = $('#profile-avatar-remove');
+  state.savingProfile = true;
+  saveButton.disabled = true;
+  removeButton.disabled = true;
+  removeButton.textContent = 'Removing…';
+  setProfileFormMessage('', false);
+
+  try {
+    // Clear the public profile reference first. If Storage deletion fails, restore
+    // the reference so the profile does not unexpectedly lose its current image.
+    const cleared = await supabase.from('profiles')
+      .update({ avatar_path: null, updated_at: new Date().toISOString() })
+      .eq('id', ownerId)
+      .select('id,display_name,bio,avatar_path,created_at,updated_at')
+      .single();
+    if (cleared.error) throw cleared.error;
+
+    state.myProfile = cleared.data;
+    state.profilesById[ownerId] = cleared.data;
+    updateAuthUI();
+
+    try {
+      await removeAvatarObjectAndVerify(oldAvatarPath);
+    } catch (storageError) {
+      console.error('Could not remove profile picture from Storage:', storageError);
+      const restored = await supabase.from('profiles')
+        .update({ avatar_path: oldAvatarPath, updated_at: new Date().toISOString() })
+        .eq('id', ownerId)
+        .select('id,display_name,bio,avatar_path,created_at,updated_at')
+        .single();
+
+      if (!restored.error && restored.data) {
+        state.myProfile = restored.data;
+        state.profilesById[ownerId] = restored.data;
+        updateAuthUI();
+        await openProfilePage(ownerId);
+        setProfileFormMessage(
+          'The photo was kept because Storage did not confirm deletion. Please retry. ' +
+          (storageError.message || ''),
+          true
+        );
+        showToast('Could not remove profile photo.');
+        return;
+      }
+
+      console.error('Could not restore the profile picture reference after Storage cleanup failed:', restored.error);
+      // The profile reference is already cleared. Keep the UI honest, and report
+      // that file cleanup still needs attention instead of pretending it succeeded.
+      if (state.avatarPreviewUrl) {
+        URL.revokeObjectURL(state.avatarPreviewUrl);
+        state.avatarPreviewUrl = null;
+      }
+      $('#profile-avatar-input').value = '';
+      await openProfilePage(ownerId);
+      setProfileFormMessage(
+        'The photo is no longer displayed, but Storage could not confirm deleting its file. Please try again. ' +
+        (storageError.message || ''),
+        true
+      );
+      showToast('Profile photo cleared, but Storage cleanup needs a retry.');
+      return;
+    }
+
+    if (state.avatarPreviewUrl) {
+      URL.revokeObjectURL(state.avatarPreviewUrl);
+      state.avatarPreviewUrl = null;
+    }
+    $('#profile-avatar-input').value = '';
+    await openProfilePage(ownerId);
+    showToast('Profile photo removed from your profile and Storage.');
+  } catch (error) {
+    console.error('Could not remove profile picture:', error);
+    setProfileFormMessage(error.message || 'Your profile picture could not be removed. Please try again.', true);
+  } finally {
+    state.savingProfile = false;
+    saveButton.disabled = false;
+    removeButton.disabled = false;
+    removeButton.textContent = 'Remove profile photo';
+  }
+}
 async function boot() {
   const result = await supabase.auth.getSession();
   state.user = result.data && result.data.session ? result.data.session.user : null;
