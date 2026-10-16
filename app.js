@@ -586,6 +586,12 @@ async function cleanupOrphanedMediaObjects() {
       if (state.user?.id !== ownerId) return;
       const path = ownerId + '/' + file.name;
       if (referencedPaths.has(path)) continue;
+
+      // Avoid racing a recent upload before its gallery row has been inserted.
+      const createdAt = Date.parse(file.created_at || '');
+      const oneHourAgo = Date.now() - (60 * 60 * 1000);
+      if (!Number.isFinite(createdAt) || createdAt > oneHourAgo) continue;
+
       await removeMediaObjectAndVerify(path);
       removedCount += 1;
     }
