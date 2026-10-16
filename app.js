@@ -737,7 +737,7 @@ async function cleanupOrphanedMediaObjects() {
   }
 }
 
-async async function cleanupOrphanedAvatarObjects() {
+async function cleanupOrphanedAvatarObjects() {
   if (!state.user || orphanAvatarCleanupRunning) return;
   orphanAvatarCleanupRunning = true;
   const ownerId = state.user.id;
