@@ -5,7 +5,8 @@ A static image, GIF, and short-video sharing site for GitHub Pages. The front en
 ## Features
 
 - Email/password account creation, sign-in, sign-out, and password reset.
-- Public profiles with editable display names, bios, and uploaded avatars.
+- Public profiles with editable display names, bios, uploaded avatars, and profile-photo removal.
+- Replaced and removed profile pictures are verified as deleted from Storage; old orphaned avatar files are cleaned up safely.
 - Upload multiple images, animated GIFs, and short videos.
 - File queue with local previews, optional title and caption, and upload progress.
 - Public gallery with image/GIF/video filters, search, standalone shareable post pages, public comments, direct media links, and deletion of your own posts.
